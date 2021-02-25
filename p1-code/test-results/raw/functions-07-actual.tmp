@@ -1,0 +1,33 @@
+{
+    // Tests the read_all() function to ensure that
+    // it properly accumulates all data from an
+    // arbitrary input FD including allocating memory
+    // for the data.
+    // 
+    // NOTE: read_all() should null-terminate the
+    // strings it reads and Valgrind might report
+    // "Uninitialized Data" if no '\0' character is
+    // placed in the character array that is
+    // returned.
+    int fd = open("test_data/quote.txt", O_RDONLY);
+    int bytes_read = -1;
+    char *actual_read = read_all(fd, &bytes_read);
+    int result = close(fd);
+    printf("result: %d\n", result);
+    printf("bytes_read: %d\n", bytes_read);
+    printf("actual_read:\n" );
+    printf("--------------------\n" );
+    printf("%s",actual_read);
+    printf("--------------------\n" );
+    free(actual_read);
+}
+result: 0
+bytes_read: 125
+actual_read:
+--------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+--------------------
+ALERTS:

@@ -1,0 +1,32 @@
+{
+    // Tests whether cmdcol_add() properly adds a cmd to
+    // those tracked by a cmdcol and that cmdcol_freeall()
+    // correctly frees memory associated with the collection.
+    char *children[][5] = {
+      {"cat","test_data/quote.txt",NULL},    
+      {"ls","-a","test_data/stuff",NULL},
+      {"ls","-a","-F","test_data/stuff",NULL},
+      {"gcc","-o","test_data/test_args","test_data/test_args.c",NULL},
+      {"grep","-i", "flurbo ","test_data/gettysburg.txt",NULL},
+      {NULL},
+    };
+    cmdcol_t cmdcol_actual = {};
+    cmdcol_t *cmdcol = &cmdcol_actual;
+    for(int i=0; children[i][0] != NULL; i++){
+      cmd_t *cmd = cmd_new(children[i]);
+      cmdcol_add(cmdcol, cmd);
+    }
+    printf("cmdcol->size: %d\n",cmdcol->size);
+    for(int i=0; children[i][0] != NULL; i++){
+      printf("cmdcol->cmd[%d]->name: %s\n",
+             i, cmdcol->cmd[i]->name);
+    }
+    cmdcol_freeall(cmdcol);
+}
+cmdcol->size: 5
+cmdcol->cmd[0]->name: cat
+cmdcol->cmd[1]->name: ls
+cmdcol->cmd[2]->name: ls
+cmdcol->cmd[3]->name: gcc
+cmdcol->cmd[4]->name: grep
+ALERTS:

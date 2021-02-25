@@ -1,0 +1,32 @@
+{
+    // Adds several commands to a collection, starts those
+    // commands, then blocks for updates on all commands
+    // via cmdcol_update_state(). Should produce alerts
+    // that all of the children have finished and there
+    // should be alerts for all children.
+    char *children[][5] = {
+      {"cat","test_data/quote.txt",NULL},    
+      {"ls","-a","test_data/stuff",NULL},
+      {"grep","-i", "flurbo ","test_data/gettysburg.txt",NULL},
+      {"ls","-a","-F","test_data/stuff",NULL},
+      {"gcc","-o","test_data/print_args",
+                   "test_data/print_args.c",NULL},
+      {NULL},
+    };
+    cmdcol_t cmdcol_actual = {};
+    cmdcol_t *cmdcol = &cmdcol_actual;
+    for(int i=0; children[i][0] != NULL; i++){
+      cmd_t *cmd = cmd_new(children[i]);
+      cmdcol_add(cmdcol, cmd);
+      cmd_start(cmd);
+    }
+    cmdcol_update_state(cmdcol, DOBLOCK);
+    cmdcol_freeall(cmdcol);
+}
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+@!!! ls[%1]: EXIT(0)
+@!!! grep[%2]: EXIT(1)
+@!!! ls[%3]: EXIT(0)
+@!!! gcc[%4]: EXIT(0)
+

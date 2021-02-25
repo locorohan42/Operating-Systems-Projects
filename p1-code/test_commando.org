@@ -1,0 +1,1562 @@
+#+TITLE: Commando Application Tests
+#+TESTY: PREFIX="commando" 
+#+TESTY: PROGRAM="./commando --echo" 
+#+TESTY: ECHOING="both"
+#+TESTY: PROMPT="@>"
+#+TESTY: POST_FILTER="./test_standardize_pids"
+#+TESTY: USE_VALGRIND='1'
+
+* Startup, Help, Exit, and List Built-in
+Checks whether commando starts up, shows the 'help' message, runs the
+'list' built-in which should produce empty output then exits.
+
+#+BEGIN_SRC sh
+@> help
+COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> exit
+ALERTS:
+#+END_SRC
+
+* Echoing via --echo and COMMANDO_ECHO
+Checks 3 behaviors
+1. Normally commando does not echo entered commands
+2. When invoked with the '--echo' options, commands are echoed
+3. When the COMMANDO_ECHO environment variable is set, commands are
+   echoed
+Does so in a BASH terminal by feeding commands to commando from a file
+on standard input.
+
+#+TESTY: use_valgrind='0'
+#+TESTY: echoing="input"
+#+TESTY: prompt="BASH>"
+#+TESTY: program="bash -v"
+#+TESTY: post_filter=""
+
+#+BEGIN_SRC sh
+BASH> unset COMMANDO_ECHO
+BASH> printf "help\nlist\nexit\n" > test-results/cmds.tmp
+BASH> ./commando < test-results/cmds.tmp && printf "\n\n"
+@> COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> 
+
+BASH> ./commando --echo < test-results/cmds.tmp && printf "\n\n"
+@> help
+COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> exit
+
+
+BASH> export COMMANDO_ECHO=1
+BASH> ./commando < test-results/cmds.tmp && printf "\n\n"
+@> help
+COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> exit
+#+END_SRC
+
+* End of Input
+Checks that if the end of input is reached, the program exits
+correctly by printing 'End of input'. End of input is triggered
+interactively by pressing 'Ctrl-d' in a terminal. In batch mode, it is
+triggered by reaching the end of an input stream (file). In such
+cases, C input functions like fgets() return NULL.
+
+#+BEGIN_SRC sh
+@> help
+COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+#+TESTY_EOF:
+@> 
+End of input
+ALERTS:
+#+END_SRC
+
+* Blank Line Handling
+Checks that blank lines (just pressing enter) are handled correctly
+with commando simply reprinting the prompt.
+
+#+BEGIN_SRC sh
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> 
+@> 
+@> help
+COMMANDO COMMANDS
+help               : show this message
+exit               : exit the program
+list               : list all jobs that have been started giving information on each
+pause nanos secs   : pause for the given number of nanseconds and seconds
+output-for int     : print the output for given job number
+output-all         : print output for all jobs
+wait-for int       : wait until the given job number finishes
+wait-all           : wait for all jobs to finish
+command arg1 ...   : non-built-in is run as a job
+@> 
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> 
+@> exit
+ALERTS:
+#+END_SRC
+
+* ls on the test_data/stuff directory
+Checks that ls produces the correct results when called on the
+provided test_data/stuff directory.
+
+#+BEGIN_SRC sh
+@> ls -a -F test_data/stuff/
+@> wait-for 0
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0          0    EXIT(0)   55 ls -a -F test_data/stuff/ 
+@> output-for 0
+@<<< Output for ls[%0] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@> exit
+ALERTS:
+@!!! ls[%0]: EXIT(0)
+#+END_SRC
+
+* cat on test_data/quote.txt file
+Checks that cat runs correctly on the test_data/quote.txt file.
+
+#+BEGIN_SRC sh
+@> cat test_data/quote.txt
+@> wait-for 0
+@> output-for 0
+@<<< Output for cat[%0] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+@> exit
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+#+END_SRC
+
+* sleep for 1s
+Runs the OS program 'sleep' to sleep for 1 second then waits for it to
+complete. Tests whether the 'wait-for' built-in command blocks
+commando properly.
+
+#+BEGIN_SRC sh
+@> sleep 1
+@> wait-for 0
+@> output-for 0
+@<<< Output for sleep[%0] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)    0 sleep 1 
+@> exit
+ALERTS:
+@!!! sleep[%0]: EXIT(0)
+#+END_SRC
+
+* ls multiple times
+Calls ls twice to check if these have distinct pids.  Waits for both
+to finish then shows the output for them which should be identical as
+they are both called on the test_data/stuff directory.
+
+#+BEGIN_SRC sh
+@> ls -a -F test_data/stuff/
+@> ls -a -F test_data/stuff/
+@> wait-for 0
+@> wait-for 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)   55 ls -a -F test_data/stuff/ 
+1    %1           0    EXIT(0)   55 ls -a -F test_data/stuff/ 
+@> output-for 0
+@<<< Output for ls[%0] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@> output-for 1
+@<<< Output for ls[%1] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@> exit
+ALERTS:
+@!!! ls[%0]: EXIT(0)
+@!!! ls[%1]: EXIT(0)
+#+END_SRC
+
+* ls and table.sh
+Calls ls and runs the test_data/table.sh command to see if their
+output is properly captured.
+
+#+BEGIN_SRC sh
+@> ls -a -F test_data/stuff/
+@> test_data/table.sh
+@> wait-for 0
+@> wait-for 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)   55 ls -a -F test_data/stuff/ 
+1    %1           0    EXIT(0) 1140 test_data/table.sh 
+@> output-for 0
+@<<< Output for ls[%0] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@> output-for 1
+@<<< Output for test_data/table.sh[%1] (1140 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+----------------------------------------
+@> exit
+ALERTS:
+@!!! ls[%0]: EXIT(0)
+@!!! test_data/table.sh[%1]: EXIT(0)
+
+#+END_SRC
+
+* rm, compile, run print_args
+Remove an executable in the test_data/ directory if present. Compile
+it, then run it.
+
+#+BEGIN_SRC sh
+@> rm -f ./test_data/print_args
+@> wait-for 0
+@> gcc -o test_data/print_args test_data/print_args.c
+@> wait-for 1
+@> test_data/print_args hello goodbye so long
+@> wait-for 2
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)    0 rm -f ./test_data/print_args 
+1    %1           0    EXIT(0)    0 gcc -o test_data/print_args test_data/print_args.c 
+2    %2           0    EXIT(0)   74 test_data/print_args hello goodbye so long 
+@> output-for 0
+@<<< Output for rm[%0] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> output-for 1
+@<<< Output for gcc[%1] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> output-for 2
+@<<< Output for test_data/print_args[%2] (74 bytes):
+----------------------------------------
+5 args received
+0: test_data/print_args
+1: hello
+2: goodbye
+3: so
+4: long
+----------------------------------------
+@> exit
+ALERTS:
+@!!! rm[%0]: EXIT(0)
+@!!! gcc[%1]: EXIT(0)
+@!!! test_data/print_args[%2]: EXIT(0)
+#+END_SRC
+
+* output-all builtin
+Same as previous test (rm, gcc, run program) but uses the 'output-all'
+builtin to show output for all commands.
+
+#+BEGIN_SRC sh
+@> rm -f ./test_data/print_args
+@> wait-for 0
+@> gcc -o test_data/print_args test_data/print_args.c
+@> wait-for 1
+@> test_data/print_args hello goodbye so long
+@> wait-for 2
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)    0 rm -f ./test_data/print_args 
+1    %1           0    EXIT(0)    0 gcc -o test_data/print_args test_data/print_args.c 
+2    %2           0    EXIT(0)   74 test_data/print_args hello goodbye so long 
+@> output-all
+@<<< Output for rm[%0] (0 bytes):
+----------------------------------------
+----------------------------------------
+@<<< Output for gcc[%1] (0 bytes):
+----------------------------------------
+----------------------------------------
+@<<< Output for test_data/print_args[%2] (74 bytes):
+----------------------------------------
+5 args received
+0: test_data/print_args
+1: hello
+2: goodbye
+3: so
+4: long
+----------------------------------------
+@> exit
+ALERTS:
+@!!! rm[%0]: EXIT(0)
+@!!! gcc[%1]: EXIT(0)
+@!!! test_data/print_args[%2]: EXIT(0)
+#+END_SRC
+
+* wait-all
+Start several independent jobs then 'wait-all' for them to complete
+before reporting their results via 'output-all'.
+
+#+BEGIN_SRC sh
+@> ls -a -F test_data/stuff/
+@> cat test_data/quote.txt
+@> cat test_data/gettysburg.txt
+@> gcc -o test_data/print_args test_data/print_args.c
+@> wait-all
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)   55 ls -a -F test_data/stuff/ 
+1    %1           0    EXIT(0)  125 cat test_data/quote.txt 
+2    %2           0    EXIT(0) 1511 cat test_data/gettysburg.txt 
+3    %3           0    EXIT(0)    0 gcc -o test_data/print_args test_data/print_args.c 
+@> output-all 
+@<<< Output for ls[%0] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@<<< Output for cat[%1] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@<<< Output for cat[%2] (1511 bytes):
+----------------------------------------
+Four score and seven years ago our fathers brought forth on this
+continent, a new nation, conceived in Liberty, and dedicated to the
+proposition that all men are created equal.
+
+Now we are engaged in a great civil war, testing whether that nation,
+or any nation so conceived and so dedicated, can long endure. We are
+met on a great battle-field of that war. We have come to dedicate a
+portion of that field, as a final resting place for those who here
+gave their lives that that nation might live. It is altogether fitting
+and proper that we should do this.
+
+But, in a larger sense, we can not dedicate -- we can not consecrate
+-- we can not hallow -- this ground. The brave men, living and dead,
+who struggled here, have consecrated it, far above our poor power to
+add or detract. The world will little note, nor long remember what we
+say here, but it can never forget what they did here. It is for us the
+living, rather, to be dedicated here to the unfinished work which they
+who fought here have thus far so nobly advanced. It is rather for us
+to be here dedicated to the great task remaining before us -- that
+from these honored dead we take increased devotion to that cause for
+which they gave the last full measure of devotion -- that we here
+highly resolve that these dead shall not have died in vain -- that
+this nation, under God, shall have a new birth of freedom -- and that
+government of the people, by the people, for the people, shall not
+perish from the earth.
+
+Abraham Lincoln
+November 19, 1863
+----------------------------------------
+@<<< Output for gcc[%3] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> exit
+ALERTS:
+@!!! ls[%0]: EXIT(0)
+@!!! cat[%1]: EXIT(0)
+@!!! cat[%2]: EXIT(0)
+@!!! gcc[%3]: EXIT(0)
+#+END_SRC
+
+* Output Changes
+Starts a program and shows it in a listing before it is complete.
+Requests output before it is complete which should be handled
+gracefully showing an 'output not ready' message.
+
+#+BEGIN_SRC c
+@> gcc -o test_data/sleep_print test_data/sleep_print.c
+@> wait-for 0
+@> test_data/sleep_print 1 hi there
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)    0 gcc -o test_data/sleep_print test_data/sleep_print.c 
+1    %1          -1        RUN   -1 test_data/sleep_print 1 hi there 
+@> output-for 1
+@<<< Output for test_data/sleep_print[%1] (-1 bytes):
+----------------------------------------
+test_data/sleep_print[%1] : output not ready
+----------------------------------------
+@> wait-for 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)    0 gcc -o test_data/sleep_print test_data/sleep_print.c 
+1    %1           1    EXIT(1)   10 test_data/sleep_print 1 hi there 
+@> output-for 1
+@<<< Output for test_data/sleep_print[%1] (10 bytes):
+----------------------------------------
+hi there 
+----------------------------------------
+@> exit
+ALERTS:
+@!!! gcc[%0]: EXIT(0)
+@!!! test_data/sleep_print[%1]: EXIT(1)
+#+END_SRC
+
+* pause builtin
+Checks that the 'pause' builtin is implemented.
+
+#+BEGIN_SRC sh
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> pause 10000 0
+@> pause 0 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+@> exit
+ALERTS:
+#+END_SRC
+
+* pause finishes single job
+Pause should allow short jobs like 'cat' to finish
+
+#+BEGIN_SRC sh
+@> cat test_data/quote.txt
+@> pause 500000000 0
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+@> output-for 0
+@<<< Output for cat[%0] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@> cat test_data/quote.txt
+@> pause 0 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+1    %1           0    EXIT(0)  125 cat test_data/quote.txt 
+@> output-for 1
+@<<< Output for cat[%1] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@> exit
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+@!!! cat[%1]: EXIT(0)
+#+END_SRC
+
+* pause finishes multiple jobs
+Multiple jobs can finish during a pause of some length.
+
+#+BEGIN_SRC sh
+@> cat test_data/quote.txt
+@> cat test_data/gettysburg.txt
+@> grep printf test_data/print_args.c
+@> pause 0 1
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+1    %1           0    EXIT(0) 1511 cat test_data/gettysburg.txt 
+2    %2           0    EXIT(0)   71 grep printf test_data/print_args.c 
+@> output-all
+@<<< Output for cat[%0] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@<<< Output for cat[%1] (1511 bytes):
+----------------------------------------
+Four score and seven years ago our fathers brought forth on this
+continent, a new nation, conceived in Liberty, and dedicated to the
+proposition that all men are created equal.
+
+Now we are engaged in a great civil war, testing whether that nation,
+or any nation so conceived and so dedicated, can long endure. We are
+met on a great battle-field of that war. We have come to dedicate a
+portion of that field, as a final resting place for those who here
+gave their lives that that nation might live. It is altogether fitting
+and proper that we should do this.
+
+But, in a larger sense, we can not dedicate -- we can not consecrate
+-- we can not hallow -- this ground. The brave men, living and dead,
+who struggled here, have consecrated it, far above our poor power to
+add or detract. The world will little note, nor long remember what we
+say here, but it can never forget what they did here. It is for us the
+living, rather, to be dedicated here to the unfinished work which they
+who fought here have thus far so nobly advanced. It is rather for us
+to be here dedicated to the great task remaining before us -- that
+from these honored dead we take increased devotion to that cause for
+which they gave the last full measure of devotion -- that we here
+highly resolve that these dead shall not have died in vain -- that
+this nation, under God, shall have a new birth of freedom -- and that
+government of the people, by the people, for the people, shall not
+perish from the earth.
+
+Abraham Lincoln
+November 19, 1863
+----------------------------------------
+@<<< Output for grep[%2] (71 bytes):
+----------------------------------------
+  printf("%d args received\n",argc);
+    printf("%d: %s\n",i,argv[i]);
+----------------------------------------
+@> exit
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+@!!! cat[%1]: EXIT(0)
+@!!! grep[%2]: EXIT(0)
+#+END_SRC
+
+* pause not done
+Starts several jobs then pauses; longer running jobs should not finish
+during the initial 'pause' but should finish after a 'wait-all'.
+
+#+BEGIN_SRC sh
+@> cat test_data/quote.txt
+@> test_data/table.sh 20 2
+@> sleep 2
+@> cat test_data/gettysburg.txt
+@> grep printf test_data/print_args.c
+@> sleep 4
+@> pause 500000000 0
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+1    %3          -1        RUN   -1 test_data/table.sh 20 2 
+2    %4          -1        RUN   -1 sleep 2 
+3    %1           0    EXIT(0) 1511 cat test_data/gettysburg.txt 
+4    %2           0    EXIT(0)   71 grep printf test_data/print_args.c 
+5    %5          -1        RUN   -1 sleep 4 
+@> output-all
+@<<< Output for cat[%0] (125 bytes):
+----------------------------------------
+Object-oriented programming is an exceptionally bad idea which could
+only have originated in California.
+
+-- Edsger Dijkstra
+----------------------------------------
+@<<< Output for test_data/table.sh[%3] (-1 bytes):
+----------------------------------------
+test_data/table.sh[%3] : output not ready
+----------------------------------------
+@<<< Output for sleep[%4] (-1 bytes):
+----------------------------------------
+sleep[%4] : output not ready
+----------------------------------------
+@<<< Output for cat[%1] (1511 bytes):
+----------------------------------------
+Four score and seven years ago our fathers brought forth on this
+continent, a new nation, conceived in Liberty, and dedicated to the
+proposition that all men are created equal.
+
+Now we are engaged in a great civil war, testing whether that nation,
+or any nation so conceived and so dedicated, can long endure. We are
+met on a great battle-field of that war. We have come to dedicate a
+portion of that field, as a final resting place for those who here
+gave their lives that that nation might live. It is altogether fitting
+and proper that we should do this.
+
+But, in a larger sense, we can not dedicate -- we can not consecrate
+-- we can not hallow -- this ground. The brave men, living and dead,
+who struggled here, have consecrated it, far above our poor power to
+add or detract. The world will little note, nor long remember what we
+say here, but it can never forget what they did here. It is for us the
+living, rather, to be dedicated here to the unfinished work which they
+who fought here have thus far so nobly advanced. It is rather for us
+to be here dedicated to the great task remaining before us -- that
+from these honored dead we take increased devotion to that cause for
+which they gave the last full measure of devotion -- that we here
+highly resolve that these dead shall not have died in vain -- that
+this nation, under God, shall have a new birth of freedom -- and that
+government of the people, by the people, for the people, shall not
+perish from the earth.
+
+Abraham Lincoln
+November 19, 1863
+----------------------------------------
+@<<< Output for grep[%2] (71 bytes):
+----------------------------------------
+  printf("%d args received\n",argc);
+    printf("%d: %s\n",i,argv[i]);
+----------------------------------------
+@<<< Output for sleep[%5] (-1 bytes):
+----------------------------------------
+sleep[%5] : output not ready
+----------------------------------------
+@> wait-all
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+1    %3           0    EXIT(0)  760 test_data/table.sh 20 2 
+2    %4           0    EXIT(0)    0 sleep 2 
+3    %1           0    EXIT(0) 1511 cat test_data/gettysburg.txt 
+4    %2           0    EXIT(0)   71 grep printf test_data/print_args.c 
+5    %5           0    EXIT(0)    0 sleep 4 
+@> exit
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+@!!! cat[%1]: EXIT(0)
+@!!! grep[%2]: EXIT(0)
+@!!! test_data/table.sh[%3]: EXIT(0)
+@!!! sleep[%4]: EXIT(0)
+@!!! sleep[%5]: EXIT(0)
+#+END_SRC
+
+* wait-for individual jobs
+Checks that wait-for waits for individual commands, not all running
+commands. Output for the different 'sleep' commands becomes available
+at different times in the below which can be coordinated by the
+'wait-for' builtin.
+
+#+BEGIN_SRC c
+@> sleep 1
+@> sleep 3
+@> sleep 2
+@> wait-for 0
+@> output-for 0
+@<<< Output for sleep[%0] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> output-for 1
+@<<< Output for sleep[%1] (-1 bytes):
+----------------------------------------
+sleep[%1] : output not ready
+----------------------------------------
+@> wait-for 2
+@> output-for 2
+@<<< Output for sleep[%2] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> output-for 1
+@<<< Output for sleep[%1] (-1 bytes):
+----------------------------------------
+sleep[%1] : output not ready
+----------------------------------------
+@> wait-all
+@> output-for 1
+@<<< Output for sleep[%1] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> exit
+ALERTS:
+@!!! sleep[%0]: EXIT(0)
+@!!! sleep[%2]: EXIT(0)
+@!!! sleep[%1]: EXIT(0)
+
+#+END_SRC
+
+* Stress 1
+Runs several commands with larger outputs and different run times.
+
+#+BEGIN_SRC sh
+@> test_data/table.sh 50 2
+@> test_data/table.sh 40 0
+@> sleep 2
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0          -1        RUN   -1 test_data/table.sh 50 2 
+1    %1          -1        RUN   -1 test_data/table.sh 40 0 
+2    %2          -1        RUN   -1 sleep 2 
+@> cat test_data/print_args.c
+@> pause 0 1
+@> output-for 1
+@<<< Output for test_data/table.sh[%1] (1520 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+----------------------------------------
+@> output-all
+@<<< Output for test_data/table.sh[%0] (-1 bytes):
+----------------------------------------
+test_data/table.sh[%0] : output not ready
+----------------------------------------
+@<<< Output for test_data/table.sh[%1] (1520 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+----------------------------------------
+@<<< Output for sleep[%2] (-1 bytes):
+----------------------------------------
+sleep[%2] : output not ready
+----------------------------------------
+@<<< Output for cat[%3] (218 bytes):
+----------------------------------------
+// Print all the arguments in the argv array
+
+#include <stdio.h>
+
+int main(int argc, char *argv[]){
+  printf("%d args received\n",argc);
+  for(int i=0; i<argc; i++){
+    printf("%d: %s\n",i,argv[i]);
+  }
+  return 0;
+}
+----------------------------------------
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0          -1        RUN   -1 test_data/table.sh 50 2 
+1    %1           0    EXIT(0) 1520 test_data/table.sh 40 0 
+2    %2          -1        RUN   -1 sleep 2 
+3    %3           0    EXIT(0)  218 cat test_data/print_args.c 
+@> wait-all
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0) 1900 test_data/table.sh 50 2 
+1    %1           0    EXIT(0) 1520 test_data/table.sh 40 0 
+2    %2           0    EXIT(0)    0 sleep 2 
+3    %3           0    EXIT(0)  218 cat test_data/print_args.c 
+@> exit
+ALERTS:
+@!!! test_data/table.sh[%1]: EXIT(0)
+@!!! cat[%3]: EXIT(0)
+@!!! test_data/table.sh[%0]: EXIT(0)
+@!!! sleep[%2]: EXIT(0)
+
+#+END_SRC
+
+* Stress 2
+Runs even more commands with larger outputs and different run
+times. Applies additional stress to commando.
+
+#+TESTY: timeout='10s'
+
+#+BEGIN_SRC sh
+@> test_data/table.sh 100 2
+@> test_data/table.sh 100 3
+@> test_data/table.sh 50 4
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0          -1        RUN   -1 test_data/table.sh 100 2 
+1    %1          -1        RUN   -1 test_data/table.sh 100 3 
+2    %2          -1        RUN   -1 test_data/table.sh 50 4 
+@> output-all
+@<<< Output for test_data/table.sh[%0] (-1 bytes):
+----------------------------------------
+test_data/table.sh[%0] : output not ready
+----------------------------------------
+@<<< Output for test_data/table.sh[%1] (-1 bytes):
+----------------------------------------
+test_data/table.sh[%1] : output not ready
+----------------------------------------
+@<<< Output for test_data/table.sh[%2] (-1 bytes):
+----------------------------------------
+test_data/table.sh[%2] : output not ready
+----------------------------------------
+@> grep flurbo test_data/gettysburg.txt
+@> pause 0 5
+@> ls -1 -a -F test_data/stuff/
+@> cat test_data/print_args.c
+@> output-all
+@<<< Output for test_data/table.sh[%0] (3801 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+i^1=     51  i^2=   2601  i^3= 132651
+i^1=     52  i^2=   2704  i^3= 140608
+i^1=     53  i^2=   2809  i^3= 148877
+i^1=     54  i^2=   2916  i^3= 157464
+i^1=     55  i^2=   3025  i^3= 166375
+i^1=     56  i^2=   3136  i^3= 175616
+i^1=     57  i^2=   3249  i^3= 185193
+i^1=     58  i^2=   3364  i^3= 195112
+i^1=     59  i^2=   3481  i^3= 205379
+i^1=     60  i^2=   3600  i^3= 216000
+i^1=     61  i^2=   3721  i^3= 226981
+i^1=     62  i^2=   3844  i^3= 238328
+i^1=     63  i^2=   3969  i^3= 250047
+i^1=     64  i^2=   4096  i^3= 262144
+i^1=     65  i^2=   4225  i^3= 274625
+i^1=     66  i^2=   4356  i^3= 287496
+i^1=     67  i^2=   4489  i^3= 300763
+i^1=     68  i^2=   4624  i^3= 314432
+i^1=     69  i^2=   4761  i^3= 328509
+i^1=     70  i^2=   4900  i^3= 343000
+i^1=     71  i^2=   5041  i^3= 357911
+i^1=     72  i^2=   5184  i^3= 373248
+i^1=     73  i^2=   5329  i^3= 389017
+i^1=     74  i^2=   5476  i^3= 405224
+i^1=     75  i^2=   5625  i^3= 421875
+i^1=     76  i^2=   5776  i^3= 438976
+i^1=     77  i^2=   5929  i^3= 456533
+i^1=     78  i^2=   6084  i^3= 474552
+i^1=     79  i^2=   6241  i^3= 493039
+i^1=     80  i^2=   6400  i^3= 512000
+i^1=     81  i^2=   6561  i^3= 531441
+i^1=     82  i^2=   6724  i^3= 551368
+i^1=     83  i^2=   6889  i^3= 571787
+i^1=     84  i^2=   7056  i^3= 592704
+i^1=     85  i^2=   7225  i^3= 614125
+i^1=     86  i^2=   7396  i^3= 636056
+i^1=     87  i^2=   7569  i^3= 658503
+i^1=     88  i^2=   7744  i^3= 681472
+i^1=     89  i^2=   7921  i^3= 704969
+i^1=     90  i^2=   8100  i^3= 729000
+i^1=     91  i^2=   8281  i^3= 753571
+i^1=     92  i^2=   8464  i^3= 778688
+i^1=     93  i^2=   8649  i^3= 804357
+i^1=     94  i^2=   8836  i^3= 830584
+i^1=     95  i^2=   9025  i^3= 857375
+i^1=     96  i^2=   9216  i^3= 884736
+i^1=     97  i^2=   9409  i^3= 912673
+i^1=     98  i^2=   9604  i^3= 941192
+i^1=     99  i^2=   9801  i^3= 970299
+i^1=    100  i^2=  10000  i^3= 1000000
+----------------------------------------
+@<<< Output for test_data/table.sh[%1] (3801 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+i^1=     51  i^2=   2601  i^3= 132651
+i^1=     52  i^2=   2704  i^3= 140608
+i^1=     53  i^2=   2809  i^3= 148877
+i^1=     54  i^2=   2916  i^3= 157464
+i^1=     55  i^2=   3025  i^3= 166375
+i^1=     56  i^2=   3136  i^3= 175616
+i^1=     57  i^2=   3249  i^3= 185193
+i^1=     58  i^2=   3364  i^3= 195112
+i^1=     59  i^2=   3481  i^3= 205379
+i^1=     60  i^2=   3600  i^3= 216000
+i^1=     61  i^2=   3721  i^3= 226981
+i^1=     62  i^2=   3844  i^3= 238328
+i^1=     63  i^2=   3969  i^3= 250047
+i^1=     64  i^2=   4096  i^3= 262144
+i^1=     65  i^2=   4225  i^3= 274625
+i^1=     66  i^2=   4356  i^3= 287496
+i^1=     67  i^2=   4489  i^3= 300763
+i^1=     68  i^2=   4624  i^3= 314432
+i^1=     69  i^2=   4761  i^3= 328509
+i^1=     70  i^2=   4900  i^3= 343000
+i^1=     71  i^2=   5041  i^3= 357911
+i^1=     72  i^2=   5184  i^3= 373248
+i^1=     73  i^2=   5329  i^3= 389017
+i^1=     74  i^2=   5476  i^3= 405224
+i^1=     75  i^2=   5625  i^3= 421875
+i^1=     76  i^2=   5776  i^3= 438976
+i^1=     77  i^2=   5929  i^3= 456533
+i^1=     78  i^2=   6084  i^3= 474552
+i^1=     79  i^2=   6241  i^3= 493039
+i^1=     80  i^2=   6400  i^3= 512000
+i^1=     81  i^2=   6561  i^3= 531441
+i^1=     82  i^2=   6724  i^3= 551368
+i^1=     83  i^2=   6889  i^3= 571787
+i^1=     84  i^2=   7056  i^3= 592704
+i^1=     85  i^2=   7225  i^3= 614125
+i^1=     86  i^2=   7396  i^3= 636056
+i^1=     87  i^2=   7569  i^3= 658503
+i^1=     88  i^2=   7744  i^3= 681472
+i^1=     89  i^2=   7921  i^3= 704969
+i^1=     90  i^2=   8100  i^3= 729000
+i^1=     91  i^2=   8281  i^3= 753571
+i^1=     92  i^2=   8464  i^3= 778688
+i^1=     93  i^2=   8649  i^3= 804357
+i^1=     94  i^2=   8836  i^3= 830584
+i^1=     95  i^2=   9025  i^3= 857375
+i^1=     96  i^2=   9216  i^3= 884736
+i^1=     97  i^2=   9409  i^3= 912673
+i^1=     98  i^2=   9604  i^3= 941192
+i^1=     99  i^2=   9801  i^3= 970299
+i^1=    100  i^2=  10000  i^3= 1000000
+----------------------------------------
+@<<< Output for test_data/table.sh[%2] (1900 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+----------------------------------------
+@<<< Output for grep[%3] (0 bytes):
+----------------------------------------
+----------------------------------------
+@<<< Output for ls[%4] (-1 bytes):
+----------------------------------------
+ls[%4] : output not ready
+----------------------------------------
+@<<< Output for cat[%5] (-1 bytes):
+----------------------------------------
+cat[%5] : output not ready
+----------------------------------------
+@> wait-for 4
+@> wait-for 5
+@> grep -n the test_data/gettysburg.txt
+@> grep -n the test_data/quote.txt
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0) 3801 test_data/table.sh 100 2 
+1    %1           0    EXIT(0) 3801 test_data/table.sh 100 3 
+2    %2           0    EXIT(0) 1900 test_data/table.sh 50 4 
+3    %3           1    EXIT(1)    0 grep flurbo test_data/gettysburg.txt 
+4    %4           0    EXIT(0)   55 ls -1 -a -F test_data/stuff/ 
+5    %5           0    EXIT(0)  218 cat test_data/print_args.c 
+6    %6          -1        RUN   -1 grep -n the test_data/gettysburg.txt 
+7    %7          -1        RUN   -1 grep -n the test_data/quote.txt 
+@> wait-all
+@> list
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0) 3801 test_data/table.sh 100 2 
+1    %1           0    EXIT(0) 3801 test_data/table.sh 100 3 
+2    %2           0    EXIT(0) 1900 test_data/table.sh 50 4 
+3    %3           1    EXIT(1)    0 grep flurbo test_data/gettysburg.txt 
+4    %4           0    EXIT(0)   55 ls -1 -a -F test_data/stuff/ 
+5    %5           0    EXIT(0)  218 cat test_data/print_args.c 
+6    %6           0    EXIT(0)  879 grep -n the test_data/gettysburg.txt 
+7    %7           1    EXIT(1)    0 grep -n the test_data/quote.txt 
+@> output-all
+@<<< Output for test_data/table.sh[%0] (3801 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+i^1=     51  i^2=   2601  i^3= 132651
+i^1=     52  i^2=   2704  i^3= 140608
+i^1=     53  i^2=   2809  i^3= 148877
+i^1=     54  i^2=   2916  i^3= 157464
+i^1=     55  i^2=   3025  i^3= 166375
+i^1=     56  i^2=   3136  i^3= 175616
+i^1=     57  i^2=   3249  i^3= 185193
+i^1=     58  i^2=   3364  i^3= 195112
+i^1=     59  i^2=   3481  i^3= 205379
+i^1=     60  i^2=   3600  i^3= 216000
+i^1=     61  i^2=   3721  i^3= 226981
+i^1=     62  i^2=   3844  i^3= 238328
+i^1=     63  i^2=   3969  i^3= 250047
+i^1=     64  i^2=   4096  i^3= 262144
+i^1=     65  i^2=   4225  i^3= 274625
+i^1=     66  i^2=   4356  i^3= 287496
+i^1=     67  i^2=   4489  i^3= 300763
+i^1=     68  i^2=   4624  i^3= 314432
+i^1=     69  i^2=   4761  i^3= 328509
+i^1=     70  i^2=   4900  i^3= 343000
+i^1=     71  i^2=   5041  i^3= 357911
+i^1=     72  i^2=   5184  i^3= 373248
+i^1=     73  i^2=   5329  i^3= 389017
+i^1=     74  i^2=   5476  i^3= 405224
+i^1=     75  i^2=   5625  i^3= 421875
+i^1=     76  i^2=   5776  i^3= 438976
+i^1=     77  i^2=   5929  i^3= 456533
+i^1=     78  i^2=   6084  i^3= 474552
+i^1=     79  i^2=   6241  i^3= 493039
+i^1=     80  i^2=   6400  i^3= 512000
+i^1=     81  i^2=   6561  i^3= 531441
+i^1=     82  i^2=   6724  i^3= 551368
+i^1=     83  i^2=   6889  i^3= 571787
+i^1=     84  i^2=   7056  i^3= 592704
+i^1=     85  i^2=   7225  i^3= 614125
+i^1=     86  i^2=   7396  i^3= 636056
+i^1=     87  i^2=   7569  i^3= 658503
+i^1=     88  i^2=   7744  i^3= 681472
+i^1=     89  i^2=   7921  i^3= 704969
+i^1=     90  i^2=   8100  i^3= 729000
+i^1=     91  i^2=   8281  i^3= 753571
+i^1=     92  i^2=   8464  i^3= 778688
+i^1=     93  i^2=   8649  i^3= 804357
+i^1=     94  i^2=   8836  i^3= 830584
+i^1=     95  i^2=   9025  i^3= 857375
+i^1=     96  i^2=   9216  i^3= 884736
+i^1=     97  i^2=   9409  i^3= 912673
+i^1=     98  i^2=   9604  i^3= 941192
+i^1=     99  i^2=   9801  i^3= 970299
+i^1=    100  i^2=  10000  i^3= 1000000
+----------------------------------------
+@<<< Output for test_data/table.sh[%1] (3801 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+i^1=     51  i^2=   2601  i^3= 132651
+i^1=     52  i^2=   2704  i^3= 140608
+i^1=     53  i^2=   2809  i^3= 148877
+i^1=     54  i^2=   2916  i^3= 157464
+i^1=     55  i^2=   3025  i^3= 166375
+i^1=     56  i^2=   3136  i^3= 175616
+i^1=     57  i^2=   3249  i^3= 185193
+i^1=     58  i^2=   3364  i^3= 195112
+i^1=     59  i^2=   3481  i^3= 205379
+i^1=     60  i^2=   3600  i^3= 216000
+i^1=     61  i^2=   3721  i^3= 226981
+i^1=     62  i^2=   3844  i^3= 238328
+i^1=     63  i^2=   3969  i^3= 250047
+i^1=     64  i^2=   4096  i^3= 262144
+i^1=     65  i^2=   4225  i^3= 274625
+i^1=     66  i^2=   4356  i^3= 287496
+i^1=     67  i^2=   4489  i^3= 300763
+i^1=     68  i^2=   4624  i^3= 314432
+i^1=     69  i^2=   4761  i^3= 328509
+i^1=     70  i^2=   4900  i^3= 343000
+i^1=     71  i^2=   5041  i^3= 357911
+i^1=     72  i^2=   5184  i^3= 373248
+i^1=     73  i^2=   5329  i^3= 389017
+i^1=     74  i^2=   5476  i^3= 405224
+i^1=     75  i^2=   5625  i^3= 421875
+i^1=     76  i^2=   5776  i^3= 438976
+i^1=     77  i^2=   5929  i^3= 456533
+i^1=     78  i^2=   6084  i^3= 474552
+i^1=     79  i^2=   6241  i^3= 493039
+i^1=     80  i^2=   6400  i^3= 512000
+i^1=     81  i^2=   6561  i^3= 531441
+i^1=     82  i^2=   6724  i^3= 551368
+i^1=     83  i^2=   6889  i^3= 571787
+i^1=     84  i^2=   7056  i^3= 592704
+i^1=     85  i^2=   7225  i^3= 614125
+i^1=     86  i^2=   7396  i^3= 636056
+i^1=     87  i^2=   7569  i^3= 658503
+i^1=     88  i^2=   7744  i^3= 681472
+i^1=     89  i^2=   7921  i^3= 704969
+i^1=     90  i^2=   8100  i^3= 729000
+i^1=     91  i^2=   8281  i^3= 753571
+i^1=     92  i^2=   8464  i^3= 778688
+i^1=     93  i^2=   8649  i^3= 804357
+i^1=     94  i^2=   8836  i^3= 830584
+i^1=     95  i^2=   9025  i^3= 857375
+i^1=     96  i^2=   9216  i^3= 884736
+i^1=     97  i^2=   9409  i^3= 912673
+i^1=     98  i^2=   9604  i^3= 941192
+i^1=     99  i^2=   9801  i^3= 970299
+i^1=    100  i^2=  10000  i^3= 1000000
+----------------------------------------
+@<<< Output for test_data/table.sh[%2] (1900 bytes):
+----------------------------------------
+i^1=      1  i^2=      1  i^3=      1
+i^1=      2  i^2=      4  i^3=      8
+i^1=      3  i^2=      9  i^3=     27
+i^1=      4  i^2=     16  i^3=     64
+i^1=      5  i^2=     25  i^3=    125
+i^1=      6  i^2=     36  i^3=    216
+i^1=      7  i^2=     49  i^3=    343
+i^1=      8  i^2=     64  i^3=    512
+i^1=      9  i^2=     81  i^3=    729
+i^1=     10  i^2=    100  i^3=   1000
+i^1=     11  i^2=    121  i^3=   1331
+i^1=     12  i^2=    144  i^3=   1728
+i^1=     13  i^2=    169  i^3=   2197
+i^1=     14  i^2=    196  i^3=   2744
+i^1=     15  i^2=    225  i^3=   3375
+i^1=     16  i^2=    256  i^3=   4096
+i^1=     17  i^2=    289  i^3=   4913
+i^1=     18  i^2=    324  i^3=   5832
+i^1=     19  i^2=    361  i^3=   6859
+i^1=     20  i^2=    400  i^3=   8000
+i^1=     21  i^2=    441  i^3=   9261
+i^1=     22  i^2=    484  i^3=  10648
+i^1=     23  i^2=    529  i^3=  12167
+i^1=     24  i^2=    576  i^3=  13824
+i^1=     25  i^2=    625  i^3=  15625
+i^1=     26  i^2=    676  i^3=  17576
+i^1=     27  i^2=    729  i^3=  19683
+i^1=     28  i^2=    784  i^3=  21952
+i^1=     29  i^2=    841  i^3=  24389
+i^1=     30  i^2=    900  i^3=  27000
+i^1=     31  i^2=    961  i^3=  29791
+i^1=     32  i^2=   1024  i^3=  32768
+i^1=     33  i^2=   1089  i^3=  35937
+i^1=     34  i^2=   1156  i^3=  39304
+i^1=     35  i^2=   1225  i^3=  42875
+i^1=     36  i^2=   1296  i^3=  46656
+i^1=     37  i^2=   1369  i^3=  50653
+i^1=     38  i^2=   1444  i^3=  54872
+i^1=     39  i^2=   1521  i^3=  59319
+i^1=     40  i^2=   1600  i^3=  64000
+i^1=     41  i^2=   1681  i^3=  68921
+i^1=     42  i^2=   1764  i^3=  74088
+i^1=     43  i^2=   1849  i^3=  79507
+i^1=     44  i^2=   1936  i^3=  85184
+i^1=     45  i^2=   2025  i^3=  91125
+i^1=     46  i^2=   2116  i^3=  97336
+i^1=     47  i^2=   2209  i^3= 103823
+i^1=     48  i^2=   2304  i^3= 110592
+i^1=     49  i^2=   2401  i^3= 117649
+i^1=     50  i^2=   2500  i^3= 125000
+----------------------------------------
+@<<< Output for grep[%3] (0 bytes):
+----------------------------------------
+----------------------------------------
+@<<< Output for ls[%4] (55 bytes):
+----------------------------------------
+./
+../
+empty
+gettysburg.txt
+quote.txt
+table.sh*
+util.o
+----------------------------------------
+@<<< Output for cat[%5] (218 bytes):
+----------------------------------------
+// Print all the arguments in the argv array
+
+#include <stdio.h>
+
+int main(int argc, char *argv[]){
+  printf("%d args received\n",argc);
+  for(int i=0; i<argc; i++){
+    printf("%d: %s\n",i,argv[i]);
+  }
+  return 0;
+}
+----------------------------------------
+@<<< Output for grep[%6] (879 bytes):
+----------------------------------------
+1:Four score and seven years ago our fathers brought forth on this
+2:continent, a new nation, conceived in Liberty, and dedicated to the
+5:Now we are engaged in a great civil war, testing whether that nation,
+9:gave their lives that that nation might live. It is altogether fitting
+16:say here, but it can never forget what they did here. It is for us the
+17:living, rather, to be dedicated here to the unfinished work which they
+18:who fought here have thus far so nobly advanced. It is rather for us
+19:to be here dedicated to the great task remaining before us -- that
+20:from these honored dead we take increased devotion to that cause for
+21:which they gave the last full measure of devotion -- that we here
+22:highly resolve that these dead shall not have died in vain -- that
+24:government of the people, by the people, for the people, shall not
+25:perish from the earth.
+----------------------------------------
+@<<< Output for grep[%7] (0 bytes):
+----------------------------------------
+----------------------------------------
+@> exit
+ALERTS:
+@!!! test_data/table.sh[%0]: EXIT(0)
+@!!! test_data/table.sh[%1]: EXIT(0)
+@!!! test_data/table.sh[%2]: EXIT(0)
+@!!! grep[%3]: EXIT(1)
+@!!! ls[%4]: EXIT(0)
+@!!! cat[%5]: EXIT(0)
+@!!! grep[%6]: EXIT(0)
+@!!! grep[%7]: EXIT(1)
+#+END_SRC
+

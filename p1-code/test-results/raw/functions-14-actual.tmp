@@ -1,0 +1,26 @@
+{
+    // Tests whether cmd_print_output() correctly
+    // captures and prints a completed command's output.
+    char *argv[] = {
+      "grep",
+      "-i",
+      "the ",
+      "test_data/gettysburg.txt",
+      NULL
+    };
+    cmd_t *cmd = cmd_new(argv);
+    cmd_start(cmd);                // start running
+    cmd_update_state(cmd,DOBLOCK); // wait for completion
+                                   // should see an alert
+    cmd_print_output(cmd);
+    cmd_free(cmd);
+}
+-- we can not hallow -- this ground. The brave men, living and dead,
+add or detract. The world will little note, nor long remember what we
+living, rather, to be dedicated here to the unfinished work which they
+to be here dedicated to the great task remaining before us -- that
+which they gave the last full measure of devotion -- that we here
+government of the people, by the people, for the people, shall not
+perish from the earth.
+ALERTS:
+@!!! grep[%0]: EXIT(0)

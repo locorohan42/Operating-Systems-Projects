@@ -1,0 +1,40 @@
+{
+    // Tests cmd_start() to properly adjust data in
+    // a cmd_t after forking a child process to run
+    // the command. Fields such as str_status should
+    // reflect that the command has started running.
+    // If the pipes have been setup properly, no output
+    // will appear on the screen for the child command.
+    char *argv[] = {
+      "ls",
+      "-F",
+      "-a",
+      "-1",
+      "test_data/stuff",
+      NULL
+    };
+    cmd_t *cmd = cmd_new(argv);
+    assert_pointers_unique(argv, cmd);
+    cmd_start(cmd);
+    test_print_cmd(cmd);
+    cmd_free(cmd);
+}
+cmd->name: ls
+cmd->argv[]:
+  [  0] : ls
+  [  1] : -F
+  [  2] : -a
+  [  3] : -1
+  [  4] : test_data/stuff
+  [  5] : (null)
+cmd->pid > 0 : yes
+cmd->pid: %0
+cmd->out_pipe[PREAD]  > 0: yes
+cmd->out_pipe[PWRITE] > 0: yes
+cmd->status: -1
+cmd->str_status: RUN
+cmd->finished: 0
+cmd->output_size: -1
+cmd->output:
+(null)
+ALERTS:

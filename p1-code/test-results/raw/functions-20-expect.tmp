@@ -1,0 +1,54 @@
+{
+    // Adds to a cmd collection, runs commands, and
+    // the prints showing most commands in the RUN
+    // state. Then waits for them to complete via
+    // cmdcol_update_state(). Calls cmdcol_print() to
+    // show most commands in EXIT(..) state.
+    char *children[][5] = {
+      {"cat","test_data/quote.txt",NULL},    
+      {"ls","-a","test_data/stuff",NULL},
+      {"grep","-i", "flurbo ","test_data/gettysburg.txt",NULL},
+      {"ls","-a","-F","test_data/stuff",NULL},
+      {"gcc","-o","test_data/print_args",
+                   "test_data/print_args.c",NULL},
+      {NULL},
+    };
+    cmdcol_t cmdcol_actual = {};
+    cmdcol_t *cmdcol = &cmdcol_actual;
+    for(int i=0; children[i][0] != NULL; i++){
+      cmd_t *cmd = cmd_new(children[i]);
+      cmdcol_add(cmdcol, cmd);
+      cmd_start(cmd);
+    }
+    printf("Before cmdcol_update_state()\n");
+    cmdcol_print(cmdcol);       // RUN
+
+    cmdcol_update_state(cmdcol, DOBLOCK);
+
+    printf("\n");
+    printf("After cmdcol_update_state()\n");
+    cmdcol_print(cmdcol);       // EXIT(..)
+    cmdcol_freeall(cmdcol);
+}
+Before cmdcol_update_state()
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0          -1        RUN   -1 cat test_data/quote.txt 
+1    %1          -1        RUN   -1 ls -a test_data/stuff 
+2    %2          -1        RUN   -1 grep -i flurbo  test_data/gettysburg.txt 
+3    %3          -1        RUN   -1 ls -a -F test_data/stuff 
+4    %4          -1        RUN   -1 gcc -o test_data/print_args test_data/print_args.c 
+
+After cmdcol_update_state()
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    %0           0    EXIT(0)  125 cat test_data/quote.txt 
+1    %1           0    EXIT(0)   52 ls -a test_data/stuff 
+2    %2           1    EXIT(1)    0 grep -i flurbo  test_data/gettysburg.txt 
+3    %3           0    EXIT(0)   55 ls -a -F test_data/stuff 
+4    %4           0    EXIT(0)    0 gcc -o test_data/print_args test_data/print_args.c 
+ALERTS:
+@!!! cat[%0]: EXIT(0)
+@!!! ls[%1]: EXIT(0)
+@!!! grep[%2]: EXIT(1)
+@!!! ls[%3]: EXIT(0)
+@!!! gcc[%4]: EXIT(0)
+

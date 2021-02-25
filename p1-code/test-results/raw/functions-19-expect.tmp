@@ -1,0 +1,24 @@
+{
+    // Adds to a cmd collection then calls cmdcol_print()
+    // to show the state of the cmds prior to running.
+    char *children[][5] = {
+      {"cat","test_data/quote.txt",NULL},    
+      {"ls","-a","test_data/stuff",NULL},
+      {"ls","-a","-F","test_data/stuff",NULL},
+      {NULL},
+    };
+    cmdcol_t cmdcol_actual = {};
+    cmdcol_t *cmdcol = &cmdcol_actual;
+    for(int i=0; children[i][0] != NULL; i++){
+      cmd_t *cmd = cmd_new(children[i]);
+      cmdcol_add(cmdcol, cmd);
+    }
+    cmdcol_print(cmdcol);
+    cmdcol_freeall(cmdcol);
+}
+JOB  #PID      STAT   STR_STAT OUTB COMMAND
+0    #-1         -1       INIT   -1 cat test_data/quote.txt 
+1    #-1         -1       INIT   -1 ls -a test_data/stuff 
+2    #-1         -1       INIT   -1 ls -a -F test_data/stuff 
+ALERTS:
+

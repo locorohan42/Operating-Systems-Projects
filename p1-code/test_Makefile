@@ -1,0 +1,55 @@
+# UPDATED: Thu Feb  4 10:44:53 AM CST 2021 
+# 
+# TESTING TARGETS FOR COMMANDO
+# 
+# This file proves the targets
+# > make test-cmd       # test functions in the cmd.c and cmdcol.c files
+# > make test-commando  # test the commando application
+# > make clean-tests    # remove temporary files generated during testing
+# > make zip            # create a zip of the project for submission
+# 
+# At the END OF YOUR Makefile insert the following directive to add
+# the testing targets:
+#
+# include test_Makefile
+
+############################################################
+# Testing Targets
+test : test-cmd test-commando 
+
+test-setup : 			# sets permissions and creates some files for tests
+	chmod u+x testy test_standardize_pids
+	touch test_data/stuff/empty
+	chmod a-x test_data/stuff/* test_data/*
+	chmod -R u+rwX test_data/
+	chmod u+x test_data/table.sh test_data/stuff/table.sh
+
+# program that tests functions in cmd.c and cmdcol.c
+test_cmd : test_cmd.c cmd.c cmdcol.c #commando.h 
+	gcc -Wall -Werror -g -o $@ $^
+
+# gcc -Wall -Werror -g -o test_cmd test_cmd.c cmd.c cmdcol.c commando.h 
+
+test-cmd : test_cmd test-setup
+	./testy test_cmd.org $(testnum)
+
+test-commando : commando test-setup
+	./testy test_commando.org $(testnum)
+
+# clean up th testing files
+clean-tests :
+	rm -rf test_cmd test-results/
+
+
+############################################################
+# 'make zip' to create p1-code.zip for submission
+AN     = $(shell head -1 00_ID.txt)
+CLASS  = $(shell tail -1 00_ID.txt)
+SHELL  = bash
+CWD    = $(shell pwd | sed 's/.*\///g')
+zip : clean clean-tests
+	rm -f $(AN)-code.zip
+	cd .. && zip "$(CWD)/$(AN)-code.zip" -r "$(CWD)"
+	@echo Zip created in $(AN)-code.zip
+	@if (( $$(stat -c '%s' $(AN)-code.zip) > 10*(2**20) )); then echo "WARNING: $(AN)-code.zip seems REALLY big, check there are no abnormally large test files"; du -h $(AN)-code.zip; fi
+	@if (( $$(unzip -t $(AN)-code.zip | wc -l) > 256 )); then echo "WARNING: $(AN)-code.zip has 256 or more files in it which may cause submission problems"; fi
