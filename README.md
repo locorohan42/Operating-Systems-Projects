@@ -1,2 +1,2 @@
 # OperatingSystemProjects
-P1 is the commandline interface project.
+p1-code is the command line interface project.
