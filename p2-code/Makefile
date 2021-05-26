@@ -37,7 +37,7 @@ clean:
 
 
 ########################################
-help :
+help : 
 	@echo 'Typical usage is:'
 	@echo '  > make bl_server                 build the server'
 	@echo '  > make bl_client                 build the client'
