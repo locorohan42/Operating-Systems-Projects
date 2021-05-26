@@ -1,4 +1,5 @@
 #include "blather.h"
+#include <pthread.h>
 
 simpio_t simpio_actual;
 simpio_t *simpio = &simpio_actual;
@@ -53,9 +54,8 @@ int main(int argc, char *argv[]){
   pthread_create(&background_thread, NULL, background_worker, NULL);
   pthread_join(user_thread, NULL);
   pthread_join(background_thread, NULL);
-  
+
   simpio_reset_terminal_mode();
   printf("\n");                 // newline just to make returning to the terminal prettier
   return 0;
 }
-  
